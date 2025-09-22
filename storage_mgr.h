@@ -23,6 +23,10 @@ typedef struct head{
 	int length;
 } head;
 extern struct head *dir;
+
+extern RC append(head*, link*);
+extern RC delete(head*, link*);
+extern void *lIndex(head*, int);
 /************************************************************
  *                    interface                             *
  ************************************************************/

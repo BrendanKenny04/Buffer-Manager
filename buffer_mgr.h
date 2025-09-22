@@ -3,18 +3,19 @@
 
 // Include return codes and methods for logging errors
 #include "dberror.h"
+#include "storage_mgr.h"
 
 // Include bool DT
 #include "dt.h"
 
 // Replacement Strategies
-typedef enum ReplacementStrategy {
+typedef enum RS {
 	RS_FIFO = 0,
 	RS_LRU = 1,
 	RS_CLOCK = 2,
 	RS_LFU = 3,
 	RS_LRU_K = 4
-} ReplacementStrategy;
+} RS;
 
 // Data Types and Structures
 typedef int PageNumber;
@@ -23,7 +24,7 @@ typedef int PageNumber;
 typedef struct BM_BufferPool {
 	char *pageFile;
 	int numPages;
-	ReplacementStrategy strategy;
+	RS strategy;
 	void *mgmtData; // use this one to store the bookkeeping info your buffer
 	// manager needs for a buffer pool
 } BM_BufferPool;
@@ -33,6 +34,16 @@ typedef struct BM_PageHandle {
 	char *data;
 } BM_PageHandle;
 
+typedef struct mData {
+	int IO[2];
+	bool *dirty;
+	int *fixcount;
+	int *age;
+	BM_PageHandle *map;
+	void *sinf;
+	SM_FileHandle *pf;
+} mData;
+
 // convenience macros
 #define MAKE_POOL()					\
 		((BM_BufferPool *) malloc (sizeof(BM_BufferPool)))
@@ -41,8 +52,8 @@ typedef struct BM_PageHandle {
 		((BM_PageHandle *) malloc (sizeof(BM_PageHandle)))
 
 // Buffer Manager Interface Pool Handling
-RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName, 
-		const int numPages, ReplacementStrategy strategy,
+RC initBufferPool(BM_BufferPool *const bm, char *const pageFileName, 
+		const int numPages, RS strategy,
 		void *stratData);
 RC shutdownBufferPool(BM_BufferPool *const bm);
 RC forceFlushPool(BM_BufferPool *const bm);

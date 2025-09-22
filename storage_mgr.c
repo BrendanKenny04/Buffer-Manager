@@ -24,70 +24,44 @@ RC append (head* h, link* l){
 RC delete (head* h, link* l){
     if(h->first){
         link *i = h->first;
-        while (i->next){
+        do{
             if(i==l){
                 h->first=i->next;
+                h->length-=1;
                 return RC_OK;
             }else if(i->next==l){
                 i->next=i->next->next;
                 h->length-=1;
                 return RC_OK;
             }else i = i->next;
-        }
+        }while (i->next);
         return RC_FILE_NOT_FOUND;
+    }else return RC_FILE_NOT_FOUND;
+}
+void *lIndex(head* h, int pageNum){
+    link *j = h->first;
+    for(int i=0; i<pageNum;i++){
+        j = j->next;
     }
+    return j->data;
 }
 
-void main(){
-    initStorageManager();
-    char* f1 = "File One";
-    char* f2 = "File Two";
-    char* f3 = "File Three";
-    createPageFile(f1);
-    createPageFile(f2);
-    createPageFile(f3);
-    SM_FileHandle *fileone = malloc(24);
-    SM_FileHandle *filetwo = malloc(24);
-    openPageFile(f1,fileone);
-    openPageFile(f2,filetwo);
-
-
-    SM_PageHandle memone = malloc(PAGE_SIZE);
-    SM_PageHandle memtwo = malloc(PAGE_SIZE);
-    for (int i=0;i<PAGE_SIZE;i++){
-        sprintf(memone+i,"%x",i%16);
-        sprintf(memtwo+i,"%d",i%2);
-    }
-    ensureCapacity(2,filetwo);
-
-    writeBlock(0,filetwo,memone);
-    writeBlock(1,filetwo,memtwo);
-
-
-    closePageFile(fileone);
-    closePageFile(filetwo);
-    destroyPageFile(f3);
-    destroyPageFile(f2);
-    destroyPageFile(f1);
-}
 void initStorageManager (void){
     dir = calloc(1,DIR_SIZE);
     dir->first=NULL;
     dir->length=0;
 }
 RC createPageFile (char *fileName){
-    SM_FileHandle *new = malloc(24);
+    SM_FileHandle *new = calloc(1,sizeof(SM_FileHandle));
     new->fileName=fileName;
     new->totalNumPages=1;
     new->curPagePos=0;
-    link *page = malloc(16);
-    page->next = NULL;
+    link *page = calloc(1,sizeof(link));
     page->data = calloc(1,PAGE_SIZE);
     head *plist = calloc(1,DIR_SIZE);
     append(plist,page);
     new->mgmtInfo = plist;
-    link *file = malloc(16);
-    file->next = NULL;
+    link *file = calloc(1,sizeof(link));
     file->data = new;
     append(dir,file);
     return RC_OK;
@@ -120,6 +94,7 @@ RC destroyPageFile (char *fileName){
     do{
         SM_FileHandle *f = i->data;
         if(strcmp(f->fileName,fileName)==0){
+            delete(dir,i);
             head *p = f->mgmtInfo;
             link *j = p->first;
             do{
@@ -147,11 +122,12 @@ RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
     head *pagelist = fHandle->mgmtInfo;
     if(pageNum<0 || pageNum>=pagelist->length) return RC_READ_NON_EXISTING_PAGE;
     link *i = pagelist->first;
-    for(int k;k<pageNum;k++){
+    for(int k=0;k<pageNum;k++){
         if(i->next)i=i->next;
     }
     char* page = i->data;
     strncpy(memPage,page,PAGE_SIZE);
+    fHandle->curPagePos=pageNum;
     return RC_OK;
 }
 int getBlockPos (SM_FileHandle *fHandle){
@@ -176,13 +152,14 @@ RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 /* writing blocks to a page file */
 RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
     head *pagelist = fHandle->mgmtInfo;
-    if(pageNum<0 || pageNum>=pagelist->length) return RC_READ_NON_EXISTING_PAGE;
+    if(pageNum<0 || pageNum>=pagelist->length) return RC_WRITE_FAILED;
     link *i = pagelist->first;
     for(pageNum;pageNum>0;pageNum--){
         if(i->next)i=i->next;
     }
     char* page = i->data;
     strncpy(page,memPage,PAGE_SIZE);
+    fHandle->curPagePos=pageNum;
     return RC_OK;
 }
 RC writeCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
@@ -191,7 +168,7 @@ RC writeCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 RC appendEmptyBlock (SM_FileHandle *fHandle){
     head* pl = fHandle->mgmtInfo;
     void* new = calloc(1,PAGE_SIZE);
-    link* l = malloc(16);
+    link* l = calloc(1,sizeof(link));
     l->data=new;
     RC err = append(pl,l);
     if(!err) fHandle->totalNumPages+=1;
